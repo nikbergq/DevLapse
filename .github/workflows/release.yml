@@ -1,0 +1,59 @@
+name: Release DevLapse
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore packages
+        run: dotnet restore
+
+      - name: Publish
+        run: dotnet publish DevLapse.csproj -c Release -o build
+
+      - name: Create ZIP
+        run: Compress-Archive -Path build/* -DestinationPath DevLapse-${{ github.event.inputs.version }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: DevLapse
+          path: DevLapse-${{ github.event.inputs.version }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: DevLapse
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: DevLapse ${{ github.event.inputs.version }}
+          files: DevLapse-${{ github.event.inputs.version }}.zip
+          generate_release_notes: true
